@@ -11,7 +11,7 @@
                 "version": "1.0.1.0",
                 "changelog": "Adds a \"Radarr Upcoming\" Jellyfin collection that is automatically kept in sync with the Radarr Wanted list. Movies from Radarr that already exist in the Jellyfin library are added to (or removed from) the collection on each hourly sync, so the collection appears natively on the Jellyfin home page under Collections.\n",
                 "targetAbi": "10.9.0.0",
-                "sourceUrl": "https://github.com/riccardo-runci/Jellyfin.Plugin.RadarrUpcoming/releases/download/v1.0.1/radarr-upcoming/radarr-upcoming_1.0.1.0.zip",
+                "sourceUrl": "https://github.com/riccardo-runci/Jellyfin.Plugin.RadarrUpcoming/releases/download/v1.0.1/radarr-upcoming_1.0.1.0.zip",
                 "checksum": "b70ab154382f10daeb2fae6a8ec1f0d4",
                 "timestamp": "2026-04-05T00:54:28Z"
             },

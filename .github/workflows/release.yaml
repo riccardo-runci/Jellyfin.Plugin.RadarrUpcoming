@@ -92,32 +92,85 @@ jobs:
           draft: false
           prerelease: false
 
-      # Use JPRM's own repo commands to build a proper manifest.json
-      # that accumulates all versions across releases.
-      - name: Update manifest.json with JPRM
+      # Build manifest.json manually so sourceUrl points directly at the
+      # GitHub Release asset (JPRM always appends a slug subfolder to --url,
+      # which produces a 404 when the zip lives at the release root).
+      - name: Update manifest.json
         run: |
-          # The zip was uploaded to the GitHub Release; set the base URL to
-          # that release's download directory so sourceUrl points there.
           artifact_filename=$(basename "${{ env.ARTIFACT }}")
-          release_download_base="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}"
+          source_url="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${artifact_filename}"
+          checksum=$(md5sum "${{ env.ARTIFACT }}" | awk '{print $1}')
+          timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          version="${{ steps.version.outputs.version }}"
 
-          # Initialise the repo dir (idempotent)
-          mkdir -p repo
-          jprm repo init repo
+          # Read plugin metadata from build.yaml
+          plugin_name=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d['name'])")
+          plugin_guid=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d['guid'])")
+          plugin_desc=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('description', d.get('overview','')))")
+          plugin_overview=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('overview',''))")
+          plugin_owner=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('owner',''))")
+          plugin_category=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('category','General'))")
+          plugin_abi=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('targetAbi','10.9.0.0'))")
+          changelog=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('changelog',''))")
 
-          # If a manifest.json already exists on main, seed the repo with it
-          # so we accumulate versions rather than overwrite them.
-          if [ -f manifest.json ]; then
-            cp manifest.json repo/manifest.json
-          fi
+          # Build the new version entry
+          new_entry=$(python3 -c "
+          import json
+          print(json.dumps({
+            'version': '${version}',
+            'changelog': '''${changelog}''',
+            'targetAbi': '${plugin_abi}',
+            'sourceUrl': '${source_url}',
+            'checksum': '${checksum}',
+            'timestamp': '${timestamp}'
+          }, indent=12))
+          ")
 
-          # Add the new version, telling JPRM the base URL is the release
-          # download directory so sourceUrl resolves to the release asset.
-          jprm repo add --url "${release_download_base}" \
-            repo "${{ env.ARTIFACT }}"
+          # Merge with existing manifest.json (keep old versions, prepend new one)
+          python3 - <<'PYEOF'
+          import json, os
 
-          # Copy the generated manifest back to the root
-          cp repo/manifest.json manifest.json
+          new_version = "${version}"
+          new_entry = {
+            "version": new_version,
+            "changelog": open("build.yaml").read().split("changelog:")[-1].strip().split("\n")[0].strip().strip("'\""),
+            "targetAbi": "${plugin_abi}",
+            "sourceUrl": "${source_url}",
+            "checksum": "${checksum}",
+            "timestamp": "${timestamp}"
+          }
+
+          # Read changelog properly via yaml
+          import yaml
+          build = yaml.safe_load(open("build.yaml"))
+          new_entry["changelog"] = str(build.get("changelog", "")).strip()
+
+          manifest_path = "manifest.json"
+          if os.path.exists(manifest_path):
+            with open(manifest_path) as f:
+              manifest = json.load(f)
+          else:
+            manifest = [{
+              "guid": "${plugin_guid}",
+              "name": "${plugin_name}",
+              "description": str(build.get("description", build.get("overview", ""))).strip(),
+              "overview": str(build.get("overview", "")).strip(),
+              "owner": "${plugin_owner}",
+              "category": "${plugin_category}",
+              "versions": []
+            }]
+
+          plugin = manifest[0]
+          # Remove any existing entry for this version, then prepend the new one
+          plugin["versions"] = [v for v in plugin.get("versions", []) if v["version"] != new_version]
+          plugin["versions"].insert(0, new_entry)
+
+          with open(manifest_path, "w") as f:
+            json.dump(manifest, f, indent=4)
+            f.write("\n")
+          print(f"manifest.json updated with version {new_version}")
+          print(f"sourceUrl: ${source_url}")
+          PYEOF
 
       - name: Commit manifest.json to main
         run: |
