@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g. 1.0.0)"
+        description: "Version to release (e.g. 1.0.0.0)"
         required: true
 
 jobs:
@@ -19,100 +19,111 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          # Need full history so we can push back to main
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
 
-      # JPRM builds the plugin and produces a versioned zip + manifest fragment
-      - name: Build with JPRM
-        uses: oddstr13/jellyfin-plugin-repository-manager@v1.1.1
-        id: jprm
-        with:
-          dotnet-target: "net9.0"
+      # Install JPRM (Jellyfin Plugin Repository Manager)
+      - name: Install JPRM
+        run: pip install jprm
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifact
-          path: ${{ steps.jprm.outputs.artifact }}
-          if-no-files-found: error
-          retention-days: 30
-
-      # Derive the version string from the git tag (strip leading "v")
+      # Derive version from tag (strip leading "v") or manual input
       - name: Derive version
         id: version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
           else
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            # tag is e.g. v1.0.0 → version 1.0.0.0
+            raw="${GITHUB_REF_NAME#v}"
+            # If the version has fewer than 4 parts, append .0
+            IFS='.' read -ra parts <<< "$raw"
+            while [ "${#parts[@]}" -lt 4 ]; do parts+=("0"); done
+            echo "version=$(IFS='.'; echo "${parts[*]}")" >> "$GITHUB_OUTPUT"
           fi
 
-      # Create (or update) the GitHub Release and upload the artifact
+      # Build the plugin zip with the correct version baked in
+      - name: Build plugin with JPRM
+        run: |
+          mkdir -p artifacts
+          zipfile=$(jprm --verbosity=debug plugin build . \
+            --output=artifacts \
+            --version="${{ steps.version.outputs.version }}" \
+            --dotnet-framework net9.0)
+          echo "ARTIFACT=${zipfile}" >> "$GITHUB_ENV"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact
+          path: ${{ env.ARTIFACT }}
+          if-no-files-found: error
+          retention-days: 30
+
+      # Create/update the GitHub Release and upload the zip
       - name: Create GitHub Release
+        id: release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: "Radarr Upcoming ${{ steps.version.outputs.version }}"
+          name: "Radarr Upcoming v${{ steps.version.outputs.version }}"
           body: |
             ## Radarr Upcoming v${{ steps.version.outputs.version }}
 
-            ### Installation via Jellyfin Plugin Repository
+            ### Install via Jellyfin Plugin Repository (recommended)
 
             1. Open Jellyfin → **Dashboard → Plugins → Repositories**
-            2. Add the following URL as a new repository:
+            2. Add this URL:
                ```
                https://raw.githubusercontent.com/${{ github.repository }}/main/manifest.json
                ```
-            3. Refresh the catalog and install **Radarr Upcoming**.
+            3. Search the catalog for **Radarr Upcoming** and install it.
 
-            ### Manual Installation
+            ### Manual install
 
-            Download the `.zip` from the assets below, extract the `.dll` into a subfolder
-            under your Jellyfin `plugins/` directory, then restart Jellyfin.
-          files: ${{ steps.jprm.outputs.artifact }}
+            Download the `.zip` below, unzip the `.dll` into a named subfolder inside
+            your Jellyfin `plugins/` directory, then restart Jellyfin.
+          files: ${{ env.ARTIFACT }}
           draft: false
           prerelease: false
 
-      # Regenerate the top-level manifest.json that serves as a plugin repository
-      - name: Update manifest.json
+      # Use JPRM's own repo commands to build a proper manifest.json
+      # that accumulates all versions across releases.
+      - name: Update manifest.json with JPRM
         run: |
-          artifact_path="${{ steps.jprm.outputs.artifact }}"
-          checksum=$(md5sum "$artifact_path" | awk '{print $1}')
-          file_size=$(stat -c%s "$artifact_path")
-          artifact_filename=$(basename "$artifact_path")
+          # Grab the raw download URL of the zip just uploaded to the release
+          artifact_filename=$(basename "${{ env.ARTIFACT }}")
           download_url="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${artifact_filename}"
 
-          cat > manifest.json <<EOF
-          [
-            {
-              "guid": "a8b7c6d5-e4f3-4a2b-b1c0-d9e8f7a6b5c4",
-              "name": "Radarr Upcoming",
-              "overview": "Shows your Radarr Wanted list as an Upcoming section in Jellyfin.",
-              "description": "Fetches the Wanted (monitored, not-yet-downloaded) movie list from your Radarr instance and exposes it through a Jellyfin REST API so it can be displayed as an Upcoming section on the home page.",
-              "owner": "riccardo-runci",
-              "category": "General",
-              "imageUrl": "",
-              "versions": [
-                {
-                  "version": "${{ steps.version.outputs.version }}",
-                  "changelog": "See https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}",
-                  "targetAbi": "10.9.0.0",
-                  "sourceUrl": "${download_url}",
-                  "checksum": "${checksum}",
-                  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-                }
-              ]
-            }
-          ]
-          EOF
+          # Initialise the repo dir (idempotent)
+          mkdir -p repo
+          jprm repo init repo
 
-      - name: Commit updated manifest.json
+          # If a manifest.json already exists on main, seed the repo with it
+          # so we accumulate versions rather than overwrite them.
+          if [ -f manifest.json ]; then
+            cp manifest.json repo/manifest.json
+          fi
+
+          # Add the new version to the repo, pointing at the release download URL
+          jprm repo add --url "https://raw.githubusercontent.com/${{ github.repository }}/main" \
+            repo "${{ env.ARTIFACT }}"
+
+          # Copy the generated manifest back to the root
+          cp repo/manifest.json manifest.json
+
+      - name: Commit manifest.json to main
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
           git add manifest.json
-          git diff --cached --quiet || git commit -m "chore: update manifest.json for ${{ github.ref_name }}"
-          git push origin HEAD:main
+          git diff --cached --quiet && echo "No changes to manifest.json" && exit 0
+          git commit -m "chore: update manifest.json for ${{ github.ref_name }}"
+          git push origin main
