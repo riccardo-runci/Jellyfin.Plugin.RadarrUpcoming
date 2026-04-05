@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- Default version used for local builds.
+         CI overrides this via JPRM using the version from build.yaml / git tag. -->
+    <Version>1.0.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,20 @@
+---
+name: "Radarr Upcoming"
+guid: "a8b7c6d5-e4f3-4a2b-b1c0-d9e8f7a6b5c4"
+version: "1.0.0.0"
+targetAbi: "10.9.0.0"
+framework: "net9.0"
+overview: "Shows your Radarr Wanted list as an Upcoming section in Jellyfin."
+description: >
+  Fetches the Wanted (monitored, not-yet-downloaded) movie list from your Radarr
+  instance and exposes it through a Jellyfin REST API so it can be displayed as
+  an Upcoming section on the home page.
+  Configure the plugin with your Radarr URL and API key under Dashboard → Plugins.
+category: "General"
+owner: "riccardo-runci"
+artifacts:
+  - "Jellyfin.Plugin.RadarrUpcoming.dll"
+changelog: >
+  Initial release.
+  Fetches Radarr Wanted list and exposes it via /RadarrUpcoming/upcoming.
+  Includes an hourly scheduled sync task and a plugin configuration page.

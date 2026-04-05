@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Radarr Upcoming</title>
+</head>
+<body>
+<div id="RadarrUpcomingConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
+     data-require="emby-input,emby-button,emby-select,emby-checkbox">
+
+    <div data-role="content">
+        <div class="content-primary">
+
+            <form id="RadarrUpcomingConfigForm">
+
+                <div class="sectionTitleContainer flex align-items-center">
+                    <h2 class="sectionTitle">Radarr Upcoming – Configuration</h2>
+                </div>
+
+                <p>
+                    Configure the connection to your Radarr instance. The plugin will fetch your
+                    <strong>Wanted</strong> (monitored, not-yet-downloaded) movie list and display it
+                    as an <strong>Upcoming</strong> section on your Jellyfin home page.
+                </p>
+
+                <!-- Radarr URL -->
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="radarrUrl">Radarr Base URL</label>
+                    <input id="radarrUrl" name="RadarrUrl" type="url" is="emby-input"
+                           placeholder="http://localhost:7878" required />
+                    <div class="fieldDescription">
+                        The URL where your Radarr instance is reachable, e.g.
+                        <code>http://localhost:7878</code> or <code>https://radarr.yourdomain.com</code>.
+                    </div>
+                </div>
+
+                <!-- API Key -->
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="apiKey">Radarr API Key</label>
+                    <input id="apiKey" name="ApiKey" type="text" is="emby-input"
+                           placeholder="Your Radarr API key" required />
+                    <div class="fieldDescription">
+                        Found in Radarr under <em>Settings → General → Security → API Key</em>.
+                    </div>
+                </div>
+
+                <!-- Max movies -->
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="maxMovies">Maximum movies to show</label>
+                    <input id="maxMovies" name="MaxMovies" type="number" is="emby-input"
+                           min="1" max="200" value="20" />
+                    <div class="fieldDescription">
+                        The maximum number of upcoming movies to display. Default is 20.
+                    </div>
+                </div>
+
+                <!-- Only with release date -->
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input id="onlyWithReleaseDate" name="OnlyWithReleaseDate"
+                               type="checkbox" is="emby-checkbox" />
+                        <span>Only show movies with a known release date</span>
+                    </label>
+                    <div class="fieldDescription checkboxFieldDescription">
+                        When enabled, movies without any known release date are hidden from the list.
+                    </div>
+                </div>
+
+                <!-- Status area -->
+                <div id="statusArea" style="margin-bottom:1em; display:none; color: var(--text-color-secondary);">
+                    <span id="statusText"></span>
+                </div>
+
+                <!-- Buttons -->
+                <div>
+                    <button is="emby-button" type="submit" class="raised button-submit block">
+                        <span>Save</span>
+                    </button>
+                </div>
+
+            </form>
+
+            <br />
+
+            <!-- Manual Refresh -->
+            <div>
+                <button is="emby-button" id="btnRefresh" type="button" class="raised block">
+                    <span>Refresh Upcoming List Now</span>
+                </button>
+                <div class="fieldDescription" style="margin-top:0.4em;">
+                    Immediately fetches the latest Wanted list from Radarr without waiting for the next scheduled sync.
+                </div>
+            </div>
+
+            <br />
+
+            <!-- Current cache info -->
+            <div id="cacheInfo" style="color: var(--text-color-secondary); font-size:0.9em;"></div>
+
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        (function () {
+            'use strict';
+
+            var pluginId = 'a8b7c6d5-e4f3-4a2b-b1c0-d9e8f7a6b5c4';
+
+            function loadConfiguration() {
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    document.getElementById('radarrUrl').value = config.RadarrUrl || 'http://localhost:7878';
+                    document.getElementById('apiKey').value = config.ApiKey || '';
+                    document.getElementById('maxMovies').value = config.MaxMovies || 20;
+                    document.getElementById('onlyWithReleaseDate').checked = !!config.OnlyWithReleaseDate;
+                    loadStatus();
+                });
+            }
+
+            function loadStatus() {
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('RadarrUpcoming/status'),
+                    type: 'GET',
+                    dataType: 'json'
+                }).then(function (status) {
+                    var infoEl = document.getElementById('cacheInfo');
+                    if (status.isConfigured) {
+                        var lastUpdated = status.lastUpdated
+                            ? new Date(status.lastUpdated).toLocaleString()
+                            : 'never';
+                        infoEl.textContent = 'Cache: ' + status.movieCount + ' movie(s) — last synced ' + lastUpdated;
+                    } else {
+                        infoEl.textContent = 'Plugin not yet configured. Enter your Radarr URL and API key above.';
+                    }
+                }).catch(function () {
+                    document.getElementById('cacheInfo').textContent = '';
+                });
+            }
+
+            function showStatus(msg, isError) {
+                var area = document.getElementById('statusArea');
+                var text = document.getElementById('statusText');
+                text.textContent = msg;
+                text.style.color = isError ? 'red' : 'green';
+                area.style.display = '';
+                setTimeout(function () { area.style.display = 'none'; }, 4000);
+            }
+
+            document.getElementById('RadarrUpcomingConfigForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    config.RadarrUrl = document.getElementById('radarrUrl').value;
+                    config.ApiKey = document.getElementById('apiKey').value;
+                    config.MaxMovies = parseInt(document.getElementById('maxMovies').value, 10) || 20;
+                    config.OnlyWithReleaseDate = document.getElementById('onlyWithReleaseDate').checked;
+
+                    ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
+                        showStatus('Settings saved successfully!', false);
+                    }).catch(function () {
+                        showStatus('Failed to save settings.', true);
+                    });
+                });
+            });
+
+            document.getElementById('btnRefresh').addEventListener('click', function () {
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('RadarrUpcoming/refresh'),
+                    type: 'POST',
+                    dataType: 'json'
+                }).then(function (movies) {
+                    showStatus('Refreshed! ' + movies.length + ' movie(s) loaded from Radarr.', false);
+                    loadStatus();
+                }).catch(function () {
+                    showStatus('Refresh failed. Check your Radarr URL and API key.', true);
+                });
+            });
+
+            // Auto-load on page open
+            document.getElementById('RadarrUpcomingConfigPage').addEventListener('pageshow', function () {
+                loadConfiguration();
+            });
+
+        }());
+    </script>
+
+</div>
+</body>
+</html>

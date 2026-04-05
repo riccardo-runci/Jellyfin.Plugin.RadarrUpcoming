@@ -1,0 +1,16 @@
+# Normalise line endings to LF in the repository; check out as-is on Windows.
+* text=auto eol=lf
+
+# Force LF for shell scripts and YAML (important for CI runners on Linux)
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.sh    text eol=lf
+
+# Force CRLF for Windows-specific files
+*.sln   text eol=crlf
+
+# Treat binaries as binary (no line-ending conversion)
+*.dll   binary
+*.zip   binary
+*.png   binary
+*.jpg   binary
