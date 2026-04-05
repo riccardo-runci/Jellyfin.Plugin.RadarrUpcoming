@@ -1,7 +1,7 @@
 ---
 name: "Radarr Upcoming"
 guid: "a8b7c6d5-e4f3-4a2b-b1c0-d9e8f7a6b5c4"
-version: "1.0.4.0"
+version: "1.0.5.0"
 targetAbi: "10.9.0.0"
 framework: "net9.0"
 overview: "Shows your Radarr Wanted list as an Upcoming section in Jellyfin."
