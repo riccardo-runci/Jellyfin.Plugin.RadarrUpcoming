@@ -8,6 +8,14 @@
         "category": "General",
         "versions": [
             {
+                "version": "1.0.5.0",
+                "changelog": "Adds stub file generation: the plugin now writes one .strm + .nfo file per Radarr wanted movie into a configurable folder on disk. Point Jellyfin at that folder as a new Movies library and the upcoming movies appear on the home page with metadata and posters \u2014 even before they are downloaded.",
+                "targetAbi": "10.9.0.0",
+                "sourceUrl": "https://github.com/riccardo-runci/Jellyfin.Plugin.RadarrUpcoming/releases/download/v1.0.5/radarr-upcoming_1.0.5.0.zip",
+                "checksum": "f54d9df199dcd1682237d0e192e5bec8",
+                "timestamp": "2026-04-05T01:19:59Z"
+            },
+            {
                 "version": "1.0.1.0",
                 "changelog": "Adds a \"Radarr Upcoming\" Jellyfin collection that is automatically kept in sync with the Radarr Wanted list. Movies from Radarr that already exist in the Jellyfin library are added to (or removed from) the collection on each hourly sync, so the collection appears natively on the Jellyfin home page under Collections.\n",
                 "targetAbi": "10.9.0.0",
