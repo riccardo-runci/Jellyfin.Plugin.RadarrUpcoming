@@ -96,81 +96,61 @@ jobs:
       # GitHub Release asset (JPRM always appends a slug subfolder to --url,
       # which produces a 404 when the zip lives at the release root).
       - name: Update manifest.json
+        env:
+          ARTIFACT: ${{ env.ARTIFACT }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          artifact_filename=$(basename "${{ env.ARTIFACT }}")
-          source_url="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${artifact_filename}"
-          checksum=$(md5sum "${{ env.ARTIFACT }}" | awk '{print $1}')
-          timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          version="${{ steps.version.outputs.version }}"
-
-          # Read plugin metadata from build.yaml
-          plugin_name=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d['name'])")
-          plugin_guid=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d['guid'])")
-          plugin_desc=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('description', d.get('overview','')))")
-          plugin_overview=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('overview',''))")
-          plugin_owner=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('owner',''))")
-          plugin_category=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('category','General'))")
-          plugin_abi=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('targetAbi','10.9.0.0'))")
-          changelog=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('build.yaml')); print(d.get('changelog',''))")
-
-          # Build the new version entry
-          new_entry=$(python3 -c "
-          import json
-          print(json.dumps({
-            'version': '${version}',
-            'changelog': '''${changelog}''',
-            'targetAbi': '${plugin_abi}',
-            'sourceUrl': '${source_url}',
-            'checksum': '${checksum}',
-            'timestamp': '${timestamp}'
-          }, indent=12))
-          ")
-
-          # Merge with existing manifest.json (keep old versions, prepend new one)
           python3 - <<'PYEOF'
-          import json, os
+import json, os, hashlib, datetime, yaml
 
-          new_version = "${version}"
-          new_entry = {
-            "version": new_version,
-            "changelog": open("build.yaml").read().split("changelog:")[-1].strip().split("\n")[0].strip().strip("'\""),
-            "targetAbi": "${plugin_abi}",
-            "sourceUrl": "${source_url}",
-            "checksum": "${checksum}",
-            "timestamp": "${timestamp}"
-          }
+artifact  = os.environ["ARTIFACT"]
+repo      = os.environ["REPO"]
+tag       = os.environ["TAG"]
+version   = os.environ["VERSION"]
 
-          # Read changelog properly via yaml
-          import yaml
-          build = yaml.safe_load(open("build.yaml"))
-          new_entry["changelog"] = str(build.get("changelog", "")).strip()
+filename   = os.path.basename(artifact)
+source_url = f"https://github.com/{repo}/releases/download/{tag}/{filename}"
+checksum   = hashlib.md5(open(artifact, "rb").read()).hexdigest()
+timestamp  = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
-          manifest_path = "manifest.json"
-          if os.path.exists(manifest_path):
-            with open(manifest_path) as f:
-              manifest = json.load(f)
-          else:
-            manifest = [{
-              "guid": "${plugin_guid}",
-              "name": "${plugin_name}",
-              "description": str(build.get("description", build.get("overview", ""))).strip(),
-              "overview": str(build.get("overview", "")).strip(),
-              "owner": "${plugin_owner}",
-              "category": "${plugin_category}",
-              "versions": []
-            }]
+build = yaml.safe_load(open("build.yaml"))
 
-          plugin = manifest[0]
-          # Remove any existing entry for this version, then prepend the new one
-          plugin["versions"] = [v for v in plugin.get("versions", []) if v["version"] != new_version]
-          plugin["versions"].insert(0, new_entry)
+new_entry = {
+    "version":   version,
+    "changelog": str(build.get("changelog", "")).strip(),
+    "targetAbi": str(build.get("targetAbi", "10.9.0.0")),
+    "sourceUrl": source_url,
+    "checksum":  checksum,
+    "timestamp": timestamp,
+}
 
-          with open(manifest_path, "w") as f:
-            json.dump(manifest, f, indent=4)
-            f.write("\n")
-          print(f"manifest.json updated with version {new_version}")
-          print(f"sourceUrl: ${source_url}")
-          PYEOF
+manifest_path = "manifest.json"
+if os.path.exists(manifest_path):
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+else:
+    manifest = [{
+        "guid":        str(build["guid"]),
+        "name":        str(build["name"]),
+        "description": str(build.get("description", build.get("overview", ""))).strip(),
+        "overview":    str(build.get("overview", "")).strip(),
+        "owner":       str(build.get("owner", "")),
+        "category":    str(build.get("category", "General")),
+        "versions":    [],
+    }]
+
+plugin = manifest[0]
+plugin["versions"] = [v for v in plugin.get("versions", []) if v["version"] != version]
+plugin["versions"].insert(0, new_entry)
+
+with open(manifest_path, "w") as f:
+    json.dump(manifest, f, indent=4)
+    f.write("\n")
+
+print(f"manifest.json updated — version={version}, sourceUrl={source_url}, checksum={checksum}")
+PYEOF
 
       - name: Commit manifest.json to main
         run: |
