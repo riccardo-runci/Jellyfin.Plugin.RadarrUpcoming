@@ -5,6 +5,7 @@ using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.RadarrUpcoming.Api;
+using Jellyfin.Plugin.RadarrUpcoming.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -22,16 +23,22 @@ namespace Jellyfin.Plugin.RadarrUpcoming.Controllers;
 public class RadarrUpcomingController : ControllerBase
 {
     private readonly RadarrService _radarrService;
+    private readonly StubWriterService _stubWriterService;
     private readonly ILogger<RadarrUpcomingController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RadarrUpcomingController"/> class.
     /// </summary>
     /// <param name="radarrService">Radarr service instance.</param>
+    /// <param name="stubWriterService">Stub writer service instance.</param>
     /// <param name="logger">Logger instance.</param>
-    public RadarrUpcomingController(RadarrService radarrService, ILogger<RadarrUpcomingController> logger)
+    public RadarrUpcomingController(
+        RadarrService radarrService,
+        StubWriterService stubWriterService,
+        ILogger<RadarrUpcomingController> logger)
     {
         _radarrService = radarrService;
+        _stubWriterService = stubWriterService;
         _logger = logger;
     }
 
@@ -84,7 +91,21 @@ public class RadarrUpcomingController : ControllerBase
             config.OnlyWithReleaseDate,
             cancellationToken).ConfigureAwait(false);
 
+        _logger.LogInformation("RadarrUpcoming: Fetched {Count} wanted movies from Radarr.", movies.Count);
+
         UpcomingMoviesCache.Set(movies);
+
+        if (!string.IsNullOrWhiteSpace(config.StubLibraryPath))
+        {
+            _logger.LogInformation("RadarrUpcoming: Writing stubs to '{Path}'.", config.StubLibraryPath);
+            await _stubWriterService.SyncStubsAsync(movies, config.StubLibraryPath, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            _logger.LogWarning("RadarrUpcoming: StubLibraryPath is not configured — stubs not written.");
+        }
+
         return Ok(movies);
     }
 

@@ -1,7 +1,7 @@
 ---
 name: "Radarr Upcoming"
 guid: "a8b7c6d5-e4f3-4a2b-b1c0-d9e8f7a6b5c4"
-version: "1.0.5.0"
+version: "1.0.6.0"
 targetAbi: "10.9.0.0"
 framework: "net9.0"
 overview: "Shows your Radarr Wanted list as an Upcoming section in Jellyfin."
@@ -15,7 +15,6 @@ owner: "riccardo-runci"
 artifacts:
   - "Jellyfin.Plugin.RadarrUpcoming.dll"
 changelog: >
-  Adds stub file generation: the plugin now writes one .strm + .nfo file per
-  Radarr wanted movie into a configurable folder on disk. Point Jellyfin at that
-  folder as a new Movies library and the upcoming movies appear on the home page
-  with metadata and posters — even before they are downloaded.
+  Fix: the manual refresh endpoint now also writes .strm/.nfo stubs to the
+  configured StubLibraryPath, instead of only updating the in-memory cache.
+  Added detailed logging so failures are visible in the Jellyfin log.
