@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.RadarrUpcoming.Api;
+using Jellyfin.Plugin.RadarrUpcoming.Library;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -14,16 +15,22 @@ namespace Jellyfin.Plugin.RadarrUpcoming.ScheduledTasks;
 public class SyncRadarrWantedTask : IScheduledTask
 {
     private readonly RadarrService _radarrService;
+    private readonly CollectionSyncService _collectionSyncService;
     private readonly ILogger<SyncRadarrWantedTask> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SyncRadarrWantedTask"/> class.
     /// </summary>
     /// <param name="radarrService">Radarr service instance.</param>
+    /// <param name="collectionSyncService">Collection sync service instance.</param>
     /// <param name="logger">Logger instance.</param>
-    public SyncRadarrWantedTask(RadarrService radarrService, ILogger<SyncRadarrWantedTask> logger)
+    public SyncRadarrWantedTask(
+        RadarrService radarrService,
+        CollectionSyncService collectionSyncService,
+        ILogger<SyncRadarrWantedTask> logger)
     {
         _radarrService = radarrService;
+        _collectionSyncService = collectionSyncService;
         _logger = logger;
     }
 
@@ -34,7 +41,7 @@ public class SyncRadarrWantedTask : IScheduledTask
     public string Key => "RadarrUpcomingSyncWanted";
 
     /// <inheritdoc />
-    public string Description => "Fetches the Wanted (missing) movie list from Radarr and caches it for display in the Upcoming section.";
+    public string Description => "Fetches the Wanted (missing) movie list from Radarr, caches it, and keeps the 'Radarr Upcoming' Jellyfin collection in sync.";
 
     /// <inheritdoc />
     public string Category => "Radarr Upcoming";
@@ -61,12 +68,16 @@ public class SyncRadarrWantedTask : IScheduledTask
             config.OnlyWithReleaseDate,
             cancellationToken).ConfigureAwait(false);
 
-        progress.Report(80);
+        progress.Report(60);
 
-        // Store result in the in-memory cache on the plugin instance
+        // Store result in the in-memory cache
         UpcomingMoviesCache.Set(movies);
 
-        _logger.LogInformation("RadarrUpcoming: Sync complete. {Count} upcoming movies cached.", movies.Count);
+        _logger.LogInformation("RadarrUpcoming: {Count} upcoming movies cached.", movies.Count);
+
+        // Sync the Jellyfin collection to match the wanted list
+        await _collectionSyncService.SyncAsync(movies, cancellationToken).ConfigureAwait(false);
+
         progress.Report(100);
     }
 
