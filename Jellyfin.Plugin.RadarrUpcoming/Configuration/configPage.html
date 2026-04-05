@@ -66,6 +66,22 @@
                     </div>
                 </div>
 
+                <!-- Stub library path -->
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="stubLibraryPath">Stub Library Path</label>
+                    <input id="stubLibraryPath" name="StubLibraryPath" type="text" is="emby-input"
+                           placeholder="e.g. /data/stubs/radarr-upcoming" />
+                    <div class="fieldDescription">
+                        An <strong>empty folder on disk</strong> where the plugin will write one
+                        <code>.strm</code> + <code>.nfo</code> file per Radarr wanted movie.
+                        After setting this path:<br />
+                        1. Save settings and run a sync.<br />
+                        2. In Jellyfin, add that folder as a new <strong>Movies</strong> library.<br />
+                        3. The wanted movies will appear on your home page with metadata and posters.<br />
+                        Leave empty to disable stub file generation.
+                    </div>
+                </div>
+
                 <!-- Status area -->
                 <div id="statusArea" style="margin-bottom:1em; display:none; color: var(--text-color-secondary);">
                     <span id="statusText"></span>
@@ -112,6 +128,7 @@
                     document.getElementById('apiKey').value = config.ApiKey || '';
                     document.getElementById('maxMovies').value = config.MaxMovies || 20;
                     document.getElementById('onlyWithReleaseDate').checked = !!config.OnlyWithReleaseDate;
+                    document.getElementById('stubLibraryPath').value = config.StubLibraryPath || '';
                     loadStatus();
                 });
             }
@@ -152,6 +169,7 @@
                     config.ApiKey = document.getElementById('apiKey').value;
                     config.MaxMovies = parseInt(document.getElementById('maxMovies').value, 10) || 20;
                     config.OnlyWithReleaseDate = document.getElementById('onlyWithReleaseDate').checked;
+                    config.StubLibraryPath = document.getElementById('stubLibraryPath').value.trim();
 
                     ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                         showStatus('Settings saved successfully!', false);

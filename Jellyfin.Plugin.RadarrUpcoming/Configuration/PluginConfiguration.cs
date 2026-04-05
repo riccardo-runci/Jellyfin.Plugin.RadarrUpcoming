@@ -26,4 +26,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets a value indicating whether to show only movies with a known release date.
     /// </summary>
     public bool OnlyWithReleaseDate { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the path to the folder where stub .strm + .nfo files will be written.
+    /// This folder should be added to Jellyfin as a Movies library so the stubs appear on the home page.
+    /// Leave empty to disable stub file generation.
+    /// </summary>
+    public string StubLibraryPath { get; set; } = string.Empty;
 }
