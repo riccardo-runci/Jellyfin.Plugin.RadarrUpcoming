@@ -90,10 +90,11 @@ public class StubWriterService
 
     private void WriteStrmFile(string path, UpcomingMovieDto movie)
     {
-        // The .strm content is just a URL. Jellyfin marks this as an online
-        // stream; we use a non-resolvable placeholder so nothing actually plays.
-        // What matters is that the file exists so Jellyfin indexes the folder.
-        var content = $"https://radarr-upcoming-stub/{movie.TmdbId}";
+        // Point to the TMDB page so that if a user clicks Play they land on
+        // the movie's TMDB page rather than getting a cryptic playback error.
+        var content = movie.TmdbId > 0
+            ? $"https://www.themoviedb.org/movie/{movie.TmdbId}"
+            : $"https://www.themoviedb.org/search?query={Uri.EscapeDataString(movie.Title)}";
         WriteIfChanged(path, content);
     }
 
