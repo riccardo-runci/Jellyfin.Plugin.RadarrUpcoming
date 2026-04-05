@@ -1,7 +1,7 @@
 ---
 name: "Radarr Upcoming"
 guid: "a8b7c6d5-e4f3-4a2b-b1c0-d9e8f7a6b5c4"
-version: "1.0.0.0"
+version: "1.0.1.0"
 targetAbi: "10.9.0.0"
 framework: "net9.0"
 overview: "Shows your Radarr Wanted list as an Upcoming section in Jellyfin."
@@ -15,6 +15,7 @@ owner: "riccardo-runci"
 artifacts:
   - "Jellyfin.Plugin.RadarrUpcoming.dll"
 changelog: >
-  Initial release.
-  Fetches Radarr Wanted list and exposes it via /RadarrUpcoming/upcoming.
-  Includes an hourly scheduled sync task and a plugin configuration page.
+  Adds a "Radarr Upcoming" Jellyfin collection that is automatically kept in sync
+  with the Radarr Wanted list. Movies from Radarr that already exist in the Jellyfin
+  library are added to (or removed from) the collection on each hourly sync, so the
+  collection appears natively on the Jellyfin home page under Collections.
