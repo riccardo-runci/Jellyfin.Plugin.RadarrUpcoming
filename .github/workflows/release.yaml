@@ -96,9 +96,10 @@ jobs:
       # that accumulates all versions across releases.
       - name: Update manifest.json with JPRM
         run: |
-          # Grab the raw download URL of the zip just uploaded to the release
+          # The zip was uploaded to the GitHub Release; set the base URL to
+          # that release's download directory so sourceUrl points there.
           artifact_filename=$(basename "${{ env.ARTIFACT }}")
-          download_url="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${artifact_filename}"
+          release_download_base="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}"
 
           # Initialise the repo dir (idempotent)
           mkdir -p repo
@@ -110,8 +111,9 @@ jobs:
             cp manifest.json repo/manifest.json
           fi
 
-          # Add the new version to the repo, pointing at the release download URL
-          jprm repo add --url "https://raw.githubusercontent.com/${{ github.repository }}/main" \
+          # Add the new version, telling JPRM the base URL is the release
+          # download directory so sourceUrl resolves to the release asset.
+          jprm repo add --url "${release_download_base}" \
             repo "${{ env.ARTIFACT }}"
 
           # Copy the generated manifest back to the root

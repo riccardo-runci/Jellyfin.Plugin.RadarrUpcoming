@@ -11,7 +11,7 @@
                 "version": "1.0.0.0",
                 "changelog": "Initial release. Fetches Radarr Wanted list and exposes it via /RadarrUpcoming/upcoming. Includes an hourly scheduled sync task and a plugin configuration page.\n",
                 "targetAbi": "10.9.0.0",
-                "sourceUrl": "https://raw.githubusercontent.com/riccardo-runci/Jellyfin.Plugin.RadarrUpcoming/main/radarr-upcoming/radarr-upcoming_1.0.0.0.zip",
+                "sourceUrl": "https://github.com/riccardo-runci/Jellyfin.Plugin.RadarrUpcoming/releases/download/v1.0.0/radarr-upcoming_1.0.0.0.zip",
                 "checksum": "532049a542a4f6a6c4d2589bb7ee3ae4",
                 "timestamp": "2026-04-05T00:43:34Z"
             }
